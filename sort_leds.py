@@ -2,6 +2,12 @@ import numpy as np
 import scipy
 import math
 
+def collinear(p0, p1, p2):
+    x1, y1 = p1[0] - p0[0], p1[1] - p0[1]
+    x2, y2 = p2[0] - p0[0], p2[1] - p0[1]
+    return abs(x1 * y2 - x2 * y1) < 1e-12
+
+
 def sort_leds(cx, cy):
     min_max_coord = [None] * 4
     sorted_cx = [None] * 5
@@ -33,17 +39,31 @@ def sort_leds(cx, cy):
         linex.append(None)
         liney.append(None)
         max_r = -2 #value is between -1 and +1
+        max_score = 0
         for _ in range(0, 5):
-            if _ in min_max_coord:
-                linex[2] = cx[_]
-                liney[2] = cy[_]
-                pearsons_r = scipy.stats.pearsonr(linex, liney)[0]
-                #new max
-                if pearsons_r > max_r:
-                    max_r = pearsons_r
-                    #found botttom led
-                    sorted_cx[4] = cx[_]
-                    sorted_cy[4] = cy[_]
+            print("test 1")
+            score = sum(collinear((cx[mid_points[0]], cy[mid_points[0]]),
+                                    (cx[mid_points[1]], cy[mid_points[1]]),
+                                      (cx[_], cy[_])))
+            print("test 2")
+            #found botttom led
+            if score >= max_score:
+                max_Score = score
+                sorted_cx[4] = cx[_]
+                sorted_cy[4] = cy[_]
+
+
+
+            # if _ in min_max_coord:
+            #     linex[2] = cx[_]
+            #     liney[2] = cy[_]
+            #     pearsons_r = scipy.stats.pearsonr(linex, liney)[0]
+            #     #new max
+            #     if pearsons_r > max_r:
+            #         max_r = pearsons_r
+            #         #found botttom led
+            #         sorted_cx[4] = cx[_]
+            #         sorted_cy[4] = cy[_]
 
         #found #4 now find others 
         distance0 = math.dist( (sorted_cx[4], sorted_cy[4]) , (cx[mid_points[0]], cy[mid_points[0]]  ))

@@ -1,22 +1,51 @@
-from unittest import result
+from matplotlib import pyplot as plt
 import numpy as np
 import cv2
-import scipy
-import math
 
 from sort_leds import sort_leds
 from calculate_angle import calulate_angle
-from find_connections import find_connections
-from process_img import process_img
-
-from gradient import gradient_descent
+from process_img import find_connections
 from rotate import rotate_image
 
-#
-#.......................................................
-VideoPath_1 = r"D:\John\Project\GOPRO\GOPRO_1\gopro_test_1.avi"
-# VideoPath_2 = r"C:\Users\clare\Documents\John\Project\GOPRO\GOPRO_2"
-# VideoPath_3 = r"C:\Users\clare\Documents\John\Project\GOPRO\GOPRO_3"
+def click_event(event, x, y, flags, params):
+  
+    # checking for left mouse clicks
+    if event == cv2.EVENT_LBUTTONDOWN:
+  
+        # displaying the coordinates
+        # on the Shell
+        print(x, ' ', y)
+  
+        # displaying the coordinates
+        # on the image window
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        cv2.putText(img, str(x) + ',' +
+                    str(y), (x,y), font,
+                    1, (255, 0, 0), 2)
+        cv2.imshow('image', img)
+  
+    # checking for right mouse clicks     
+    if event==cv2.EVENT_RBUTTONDOWN:
+  
+        # displaying the coordinates
+        # on the Shell
+        print(x, ' ', y)
+  
+        # displaying the coordinates
+        # on the image window
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        b = img[y, x, 0]
+        g = img[y, x, 1]
+        r = img[y, x, 2]
+        cv2.putText(img, str(b) + ',' +
+                    str(g) + ',' + str(r),
+                    (x,y), font, 1,
+                    (255, 255, 0), 2)
+        cv2.imshow('image', img)
+  
+VideoPath_1 = r"D:\John\Project\Trial1\Cal 02.2144931.20220906113403.avi"
+template = cv2.imread('D:\John\Project\Code\masters-project\wtemplate.png') 
+
 #       0   1   2
 #           3      
 #           4
@@ -32,79 +61,208 @@ mm_wand_lenth_2_to_3 = 148
 mm_wand_lenth_2_to_4 = 258
 mm_wand_lenth_3_to_4 = 120
 
+# real_points1 = np.float32([[0, 0,0 ], [160, 0,0], [240, 0,0], [160, 80,0], [160, 245,0]])
+# real_points = []
+# real_points.append(real_points1)
 
-kernel = np.ones((5,5),np.uint8)
 #.......................................................
-
 #Stats
-#.......................................................
 cap = cv2.VideoCapture(VideoPath_1)
 frames_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 fps= int(cap.get(cv2.CAP_PROP_FPS))
-time = frames_count / fps
+time = frames_count /fps
 frame_progress = 0
 #.......................................................
 
 
-
-
+fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=False)
 #Check if file is opened
 if (cap.isOpened()== False):
     print("Error opening video")
 
 while(cap.isOpened()):
     ret, img = cap.read()
+    
     if ret == True:
+        
+        
         frame_progress = frame_progress + 1
-        if frame_progress > 321:
-            cv2.imshow("original", img)
-            #find LEDs
-            closing, thresh1 = process_img(img, kernel)
-            contours,h = cv2.findContours(closing,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_NONE)
+        # if frame_progress > 1102:
+        if frame_progress > 400:
 
-            #circular
-            for cnt in contours:
-                approx = cv2.approxPolyDP(cnt, .03 * cv2.arcLength(cnt, True), True)
-               # print (len(approx))
-                if len(approx)!=0:
-                    area = cv2.contourArea(cnt)
-                    (cx, cy), radius = cv2.minEnclosingCircle(cnt)
-                    circleArea = radius * radius * np.pi
-                    cv2.drawContours(closing, [cnt], 0, (255, 0, 0), -1)
-            bitand = cv2.bitwise_and(closing, thresh1)
-            contours,h = cv2.findContours(bitand,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_NONE)
+            img_height, img_width = img.shape[:2]
+            led_pixels = np.zeros((img_height, img_width, 3), dtype=np.uint8)
+            og=img.copy()
 
+            fgmask = fgbg.apply(img)
+
+            # Apply morphology operations to clean up the mask
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+            fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)
+            fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel)
+
+            # Apply color thresholding to detect saturated LEDs within the moving region
+            hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+            lower = np.array([0, 0, 220 ])
+            upper = np.array([255, 255, 255])
+
+            # Create a mask of saturated pixels using the color range
+            mask = cv2.inRange(hsv, lower, upper)
+            mask = cv2.bitwise_and(mask, fgmask)
+
+            # Apply the mask to the original image to extract the saturated pixels
+            saturated_pixels = cv2.bitwise_and(img, img, mask=mask)
+
+            # Apply color thresholding to detect red LEDs within the moving region
+            lower_red = np.array([0, 100, 100])
+            upper_red = np.array([20, 255, 255])    
+            red_mask = cv2.inRange(hsv, lower_red, upper_red)
+            kernel = np.ones((3,3),np.uint8)
+            red_mask = cv2.dilate(red_mask, kernel, iterations=1)
+
+            mask = cv2.bitwise_and(fgmask, mask)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)        
+
+            # 
+
+            
+            contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            led_contours = []
+            for contour in contours:
+                area = cv2.contourArea(contour)
+                perimeter = cv2.arcLength(contour, True)
+                if perimeter != 0:
+                    circularity = 4 * np.pi * area / perimeter**2
+                else:
+                    circularity = 0 
+                if area > 10 and area < 100 and circularity > 0.25:
+                    # print(contour)
+                    led_contours.append(contour)
+
+            # Draw the contours on the original image
+            cv2.drawContours(img, led_contours, -1, (255, 0, 0), -1)
+            cv2.imshow("cont", img)
+            cv2.imshow("original", og)
+            cv2.setMouseCallback('cont', click_event)
+     
+            # print(len(led_contours))
             #process found led frame
-            if len(contours) ==5:
-                try:
-                    cx, cy = find_connections (img, contours)  
-                    cx, cy = sort_leds(cx, cy)
-                    print("sorted")
-                    calulate_angle(cx, cy)
-                except Exception:
-                    print("exception thrown")
-                    pass
-                else: 
-                    cv2.line(img, (cx[0], cy[0]), (cx[1], cy[1]), (0, 255, 0), 4 )
-                    # cv2.line(img, (cx[0], cy[0]), (cx[2], cy[2]), (0, 255, 0), 2 )
-                    cv2.line(img, (cx[0], cy[0]), (cx[3], cy[3]), (0, 255, 0), 4 )
-                    cv2.line(img, (cx[0], cy[0]), (cx[4], cy[4]), (0, 255, 0), 4 )
-                    cv2.line(img, (cx[1], cy[1]), (cx[2], cy[2]), (0, 255, 0), 4 )
-                    # cv2.line(img, (cx[1], cy[1]), (cx[4], cy[4]), (0, 255, 0), 2 )
-                    cv2.line(img, (cx[2], cy[2]), (cx[4], cy[4]), (0, 255, 0), 4 )
-                    cv2.line(img, (cx[2], cy[2]), (cx[3], cy[3]), (255, 0, 0), 4 )
-                    cv2.line(img, (cx[1], cy[1]), (cx[3], cy[3]), (0, 0, 255), 2 )
-                    cv2.line(img, (cx[3], cy[3]), (cx[4], cy[4]), (0, 0, 255), 2 )
-                    cv2.imshow("contour", img)
-                    # cv2.imshow("contour with original", cont_img)
+            if len(led_contours) !=6546:
+                cv2.drawContours(led_pixels, led_contours, -1, (255, 0, 0), -1)
+                gray_mask = cv2.cvtColor(led_pixels, cv2.COLOR_BGR2GRAY)
+                gray_img = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+                surf = cv2.xfeatures2d.SURF_create()
+                kp_mask, des_mask = surf.detectAndCompute(gray_mask, None)
+                kp_img, des_img = surf.detectAndCompute(gray_img, None)
+                bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
+                matches = bf.match(des_mask, des_img)
+                matches = [m for m in matches if m.distance < 100]
+
+                # Get keypoints for the filtered matches
+                pts_mask = np.float32([kp_mask[m.queryIdx].pt for m in matches])
+                pts_img = np.float32([kp_img[m.trainIdx].pt for m in matches])
+
+                # Use the remaining matches to estimate the homography matrix between the two images
+                H, _ = cv2.findHomography(pts_mask, pts_img, cv2.RANSAC)
+
+                # Warp the original image using the homography matrix to obtain an aligned image of the calibration wand
+                aligned_img = cv2.warpPerspective(template, H, (template.shape[1], template.shape[0]))
+
+                # Display the aligned image
+                cv2.imshow('Aligned Image', aligned_img)
                 cv2.waitKey(0)
 
-            cv2.putText(bitand, str(len(contours)), (20,20), cv2.FONT_HERSHEY_COMPLEX, .5, (255,255,255), 1, cv2.LINE_AA)
-            # cv2.imshow('contour',closing)
-        #    cv2.imshow('combine',bitand)
+
+                 # ............................................................................................
+                # try:
+                # cx, cy = find_connections (img, led_contours)  
+                # cy = [None] * 5
+                # cx = [None] * 5
+                # cx[0] = 495
+                # cx[1] = 436
+                # cx[2] = 412
+                # cx[3] = 461
+                # cx[4] = 482
+
+                # cx[0] = 474
+                # cx[1] = 443
+                # cx[2] = 426
+                # cx[3] = 396
+                # cx[4] = 353
+                # # img_points = np.array([[495, 474], [436, 443], [412, 426], [461, 396], [482, 353]], dtype=np.float32)
+                # # real_points1 = np.float32([[0, 0,0 ], [160, 0,0], [240, 0,0], [160, 80,0], [160, 245,0]])
+                # img_points = []
+                # obj_points = []
+                # camera_matrix = np.zeros((3, 3))
+                # dist_coeffs = np.zeros((5, 1))
+
+                # image_points = np.array([[495, 474], [436, 443], [412, 426], [461, 396], [482, 353]], dtype=np.float32)
+                # img_points.append(image_points)  
+                # # The focal length of the camera is 307.8219886231129 pixels
+                # # The focal length of the camera is 547.239090885534 mm
+            
+                # image_points = np.array([[235, 436], [195, 367], [175, 335], [251, 332], [311, 291]], dtype=np.float32)
+                # img_points.append(image_points)  
+                # # The focal length of the camera is 115.55118389395169 pixels
+                # # The focal length of the camera is 205.42432692258078 mm
+
+                # image_points = np.array([[1021, 127], [1007, 183], [1001, 215], [964, 188], [917, 196]], dtype=np.float32)
+                # img_points.append(image_points)  
+
+                # image_points = np.array([[1000, 336], [962, 3773], [936, 402], [920, 354], [877, 335]], dtype=np.float32)
+                # img_points.append(image_points)  
+ 
+
+
+                # object_points = np.array([[0, 0,0 ], [160, 0,0], [240, 0,0], [160, 80,0], [160, 245,0]], dtype=np.float32)
+                # obj_points.append(object_points)
+                # obj_points.append(object_points)
+                # obj_points.append(object_points)
+                # obj_points.append(object_points)
+                # retval, cameraMatrix, dist, rvecs, tvecs = cv2.calibrateCamera(obj_points, img_points, (img_height, img_width), None, None)      
+            
+
+                # # undistorted_img = cv2.undistort(img, camera_matrix, dist_coeffs)
+                # focal_length_px = cameraMatrix[0, 0]
+                # focal_length_mm = focal_length_px * (img_width/img_height)
+                # # print(f"The focal length of the camera is {focal_length_px} pixels")
+                # # print(f"The focal length of the camera is {focal_length_mm} mm")
+                
+                # h,  w = img.shape[:2]
+                # newcameramtx, roi = cv2.getOptimalNewCameraMatrix(cameraMatrix, dist, (w,h), 1, (w,h))
+                # dst = cv2.undistort(img, cameraMatrix, dist, None, newcameramtx)
+                # # crop the image
+                # x, y, w, h = roi
+                # dst = dst[y:y+h, x:x+w]
+                # cv2.imwrite('calibresult.png', dst)
+                # ............................................................................................
+
+                # if cv2.waitKey(1) & 0xFF == ord('q'):
+                #     break
+                
+                # print("found connection")
+                # cx, cy = sort_leds(cx, cy)
+                # print("sorted")
+                # calulate_angle(cx, cy)
+                # except Exception:
+                # print("exception thrown")
+                # pass
+                # else: 
+                # cv2.line(img, (cx[0], cy[0]), (cx[1], cy[1]), (0, 255, 0), 4 )
+                # # cv2.line(img, (cx[0], cy[0]), (cx[2], cy[2]), (0, 255, 0), 2 )
+                # cv2.line(img, (cx[0], cy[0]), (cx[3], cy[3]), (0, 255, 0), 4 )
+                # cv2.line(img, (cx[0], cy[0]), (cx[4], cy[4]), (0, 255, 0), 4 )
+                # cv2.line(img, (cx[1], cy[1]), (cx[2], cy[2]), (0, 255, 0), 4 )
+                # # cv2.line(img, (cx[1], cy[1]), (cx[4], cy[4]), (0, 255, 0), 2 )
+                # cv2.line(img, (cx[2], cy[2]), (cx[4], cy[4]), (0, 255, 0), 4 )
+                # cv2.line(img, (cx[2], cy[2]), (cx[3], cy[3]), (255, 0, 0), 4 )
+                # cv2.line(img, (cx[1], cy[1]), (cx[3], cy[3]), (0, 0, 255), 2 )
+                # cv2.line(img, (cx[3], cy[3]), (cx[4], cy[4]), (0, 0, 255), 2 )
+
             
         
-        # Press Q on keyboard to exit
+        # # Press Q on keyboard to exit
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
@@ -113,8 +271,6 @@ while(cap.isOpened()):
         break
 
     
-# cv2.calibrateCamera(objpoints, imgpoints, cont_img.shape[::-1],None,None)
-
 
 # When everything done, release
 # the video capture object
