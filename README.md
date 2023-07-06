@@ -1,0 +1,2 @@
+# Masters-Project-Calibration-Wand
+This repository contains the code I developed as part of my master's dissertation at Trinity College Dublin. The project investigates a novel method for calculating the intrinsic and extrinsic camera parameters of mobile phone devices using a calibration wand. The goal of this research is to improve the accuracy of parameter calculation to provide more reliable estimations of human pose in movement exercises. 
