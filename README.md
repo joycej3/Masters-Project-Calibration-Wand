@@ -13,15 +13,9 @@ pip install numpy
 pip install opencv-python
 pip install scipy
 
-bash
-Copy code
-
 Also, you need to clone the repository to your local machine. Navigate to the directory where you want to clone the repository and run the following command:
-
 git clone <repository-url>
 
-vbnet
-Copy code
 
 ### Running the code
 
