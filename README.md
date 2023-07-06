@@ -14,7 +14,7 @@ pip install opencv-python
 pip install scipy
 
 Also, you need to clone the repository to your local machine. Navigate to the directory where you want to clone the repository and run the following command:
-git clone <repository-url>
+git clone https://github.com/joycej3/Masters-Project-Calibration-Wand
 
 
 ### Running the code
@@ -24,17 +24,11 @@ git clone <repository-url>
 3. Edit the 'VideoPath_1' variable to point to the path where your video is located. This video will be used as the input for the camera calibration.
 4. Run the code from your terminal using:
 
-python <name-of-the-python-file>.py
-
-vbnet
-Copy code
-
-Remember to replace `<name-of-the-python-file>` with the actual filename of the main script.
+python main.py
 
 The code will start processing the frames in the video. It tries to find LED-like objects, calculate their angles, and draw connections between them. 
-
+Manually click and drag a box around the leds to ignore all other suggested regions that are incorrectly labelled as leds. The LED regions should then turn green
 Press 'Q' on your keyboard at any time to stop the process.
-
 At the end, the script will output some statistics about the processed frames and the video's duration.
 
 ### Note
